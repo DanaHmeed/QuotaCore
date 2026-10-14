@@ -1,10 +1,11 @@
 import express from "express";
 import { pool } from "./config/database.js";
-
+import { accountsRouter } from "./routes/accounts.js";
 const app = express();
 const PORT = 3000;
 
 app.use(express.json());
+app.use("/accounts", accountsRouter);
 
 // Check application health
 app.get("/health", (req, res) => {

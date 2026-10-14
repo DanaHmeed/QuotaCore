@@ -30,3 +30,37 @@ A backend service built with TypeScript and PostgreSQL to track resource consump
 ## Getting Started
 
 Development setup instructions will be added as the project is implemented.
+
+## Account Management
+
+### Create Account
+
+POST /accounts
+
+Requires X-Admin-Key header.
+
+Request:
+{
+  "name": "CloudDocs",
+  "planName": "Starter"
+}
+
+Creates an account, assigns a predefined account plan,
+and returns an API key.
+
+### Get Authenticated Account
+
+GET /accounts/me
+
+Requires X-API-Key header.
+
+Returns the authenticated account's information.
+
+### Security
+
+- API keys are generated using cryptographic randomness.
+- Only SHA-256 hashes of account API keys are stored.
+- Account API keys are returned only at creation.
+- Account creation is protected by a bootstrap admin key.
+- Bootstrap key management requires additional hardening
+  before production deployment.
