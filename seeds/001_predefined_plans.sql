@@ -1,0 +1,42 @@
+INSERT INTO plans (
+    name,
+    plan_type,
+    monthly_allowance,
+    max_units_per_request,
+    owner_account_id,
+    is_predefined
+)
+VALUES
+(
+    'Starter',
+    'account',
+    1000,
+    100,
+    NULL,
+    TRUE
+),
+(
+    'Pro',
+    'account',
+    10000,
+    500,
+    NULL,
+    TRUE
+),
+(
+    'Basic',
+    'user',
+    100,
+    20,
+    NULL,
+    TRUE
+),
+(
+    'Premium',
+    'user',
+    1000,
+    100,
+    NULL,
+    TRUE
+)
+ON CONFLICT DO NOTHING;
