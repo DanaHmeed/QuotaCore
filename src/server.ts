@@ -1,12 +1,13 @@
 import express from "express";
 import { pool } from "./config/database.js";
 import { accountsRouter } from "./routes/accounts.js";
+import { usersRouter } from "./routes/users.js";
 const app = express();
 const PORT = 3000;
 
 app.use(express.json());
 app.use("/accounts", accountsRouter);
-
+app.use("/users", usersRouter);
 // Check application health
 app.get("/health", (req, res) => {
   res.status(200).json({
