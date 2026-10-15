@@ -1,26 +1,11 @@
 import { Router } from "express";
 import { pool } from "../config/database.js";
 import { authenticateAccount } from "../middleware/authenticateAccount.js";
-
+import { isUuid, isUniqueViolation } from "../utils/validation.js";
 export const usersRouter = Router();
 
 usersRouter.use(authenticateAccount);
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-function isUuid(value: unknown): value is string {
-  return typeof value === "string" && UUID_RE.test(value);
-}
-
-function isUniqueViolation(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === "23505"
-  );
-}
 
 // POST /users register a user under the authenticated account
 usersRouter.post("/", async (req, res) => {
