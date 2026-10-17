@@ -4,6 +4,8 @@ import { accountsRouter } from "./routes/accounts.js";
 import { usersRouter } from "./routes/users.js";
 import { plansRouter } from "./routes/plans.js";
 import { accountPlanRouter } from "./routes/accountPlan.js";
+import { usageRouter } from "./routes/usage.js";
+
 const app = express();
 const PORT = 3000;
 
@@ -12,6 +14,8 @@ app.use("/accounts", accountsRouter);
 app.use("/accounts", accountPlanRouter);
 app.use("/users", usersRouter);
 app.use("/plans", plansRouter);
+app.use("/usage", usageRouter);
+
 // Check application health
 app.get("/health", (req, res) => {
   res.status(200).json({
