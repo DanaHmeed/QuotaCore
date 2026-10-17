@@ -1,15 +1,20 @@
 import { Router } from "express";
 import { pool } from "../config/database.js";
 import { authenticateAccount } from "../middleware/authenticateAccount.js";
-import { isUuid, isUniqueViolation } from "../utils/validation.js";
+import { isUniqueViolation, isUuid } from "../utils/validation.js";
 
 export const plansRouter = Router();
 
 plansRouter.use(authenticateAccount);
 
 const PLAN_COLUMNS = `
-  id, name, plan_type, monthly_allowance, max_units_per_request,
-  is_predefined, created_at
+  id,
+  name,
+  plan_type AS "planType",
+  monthly_allowance AS "monthlyAllowance",
+  max_units_per_request AS "maxUnitsPerRequest",
+  is_predefined AS "isPredefined",
+  created_at AS "createdAt"
 `;
 
 const isValidName = (v: unknown): v is string =>
@@ -151,7 +156,8 @@ plansRouter.patch("/:id", async (req, res) => {
     maxUnitsPerRequest === undefined
   ) {
     res.status(400).json({
-      error: "Provide at least one of: name, monthlyAllowance, maxUnitsPerRequest",
+      error:
+        "Provide at least one of: name, monthlyAllowance, maxUnitsPerRequest",
     });
     return;
   }

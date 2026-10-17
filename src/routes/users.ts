@@ -1,13 +1,24 @@
 import { Router } from "express";
 import { pool } from "../config/database.js";
 import { authenticateAccount } from "../middleware/authenticateAccount.js";
-import { isUuid, isUniqueViolation } from "../utils/validation.js";
+import { isUniqueViolation, isUuid } from "../utils/validation.js";
+
 export const usersRouter = Router();
 
 usersRouter.use(authenticateAccount);
 
+// a user together with the plan currently applied to it.
+const USER_WITH_PLAN = `
+  u.id,
+  u.external_user_id AS "externalUserId",
+  p.id AS "planId",
+  p.name AS "planName",
+  p.monthly_allowance AS "monthlyAllowance",
+  p.max_units_per_request AS "maxUnitsPerRequest",
+  u.created_at AS "createdAt"
+`;
 
-// POST /users register a user under the authenticated account
+// POST /users — register a user under the authenticated account
 usersRouter.post("/", async (req, res) => {
   const accountId = res.locals.account.id;
   const { externalUserId, planId } = req.body ?? {};
@@ -33,7 +44,12 @@ usersRouter.post("/", async (req, res) => {
       WHERE p.id = $3
         AND p.plan_type = 'user'
         AND (p.is_predefined = TRUE OR p.owner_account_id = $1)
-      RETURNING id, account_id, external_user_id, plan_id, created_at
+      RETURNING
+        id,
+        account_id AS "accountId",
+        external_user_id AS "externalUserId",
+        plan_id AS "planId",
+        created_at AS "createdAt"
       `,
       [accountId, externalUserId.trim(), planId]
     );
@@ -69,14 +85,7 @@ usersRouter.get("/", async (_req, res) => {
   try {
     const result = await pool.query(
       `
-      SELECT
-        u.id,
-        u.external_user_id,
-        p.id AS plan_id,
-        p.name AS plan_name,
-        p.monthly_allowance,
-        p.max_units_per_request,
-        u.created_at
+      SELECT ${USER_WITH_PLAN}
       FROM users u
       JOIN plans p ON u.plan_id = p.id
       WHERE u.account_id = $1
@@ -105,14 +114,7 @@ usersRouter.get("/:id", async (req, res) => {
   try {
     const result = await pool.query(
       `
-      SELECT
-        u.id,
-        u.external_user_id,
-        p.id AS plan_id,
-        p.name AS plan_name,
-        p.monthly_allowance,
-        p.max_units_per_request,
-        u.created_at
+      SELECT ${USER_WITH_PLAN}
       FROM users u
       JOIN plans p ON u.plan_id = p.id
       WHERE u.id = $1
@@ -158,7 +160,10 @@ usersRouter.patch("/:id/plan", async (req, res) => {
         AND p.id = $3
         AND p.plan_type = 'user'
         AND (p.is_predefined = TRUE OR p.owner_account_id = $2)
-      RETURNING u.id, u.external_user_id, u.plan_id
+      RETURNING
+        u.id,
+        u.external_user_id AS "externalUserId",
+        u.plan_id AS "planId"
       `,
       [userId, accountId, planId]
     );

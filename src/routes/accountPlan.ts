@@ -12,8 +12,11 @@ accountPlanRouter.get("/me/plan", authenticateAccount, async (_req, res) => {
   try {
     const result = await pool.query(
       `
-      SELECT p.id, p.name, p.monthly_allowance, p.max_units_per_request,
-             p.is_predefined
+      SELECT p.id,
+             p.name,
+             p.monthly_allowance AS "monthlyAllowance",
+             p.max_units_per_request AS "maxUnitsPerRequest",
+             p.is_predefined AS "isPredefined"
       FROM accounts a
       JOIN plans p ON p.id = a.plan_id
       WHERE a.id = $1
@@ -48,7 +51,10 @@ accountPlanRouter.put("/me/plan", authenticateAccount, async (req, res) => {
         AND p.id = $2
         AND p.plan_type = 'account'
         AND (p.is_predefined = TRUE OR p.owner_account_id = $1)
-      RETURNING p.id, p.name, p.monthly_allowance, p.max_units_per_request
+      RETURNING p.id,
+                p.name,
+                p.monthly_allowance AS "monthlyAllowance",
+                p.max_units_per_request AS "maxUnitsPerRequest"
       `,
       [accountId, planId]
     );
