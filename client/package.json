@@ -1,0 +1,21 @@
+{
+  "name": "docuflow-demo-client",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Example application that uses QuotaCore to meter document processing",
+  "scripts": {
+    "start": "tsx src/server.ts",
+    "dev": "tsx watch src/server.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

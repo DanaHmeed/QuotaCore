@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DocuFlow – QuotaCore example client</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --text: #1c2230; --muted: #667085;
+    --line: #e4e7ec; --accent: #3b5bdb; --accent-text: #ffffff;
+    --ok: #067647; --ok-bg: #ecfdf3; --no: #b42318; --no-bg: #fef3f2;
+    --info: #1d4ed8; --info-bg: #eff4ff; --bar: #e4e7ec;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151c; --card: #1a1f2b; --text: #e8ebf2; --muted: #98a2b3;
+      --line: #2b3242; --accent: #8ea2ff; --accent-text: #12151c;
+      --ok: #47cd89; --ok-bg: #12261c; --no: #f97066; --no-bg: #2a1614;
+      --info: #8ea2ff; --info-bg: #1a2140; --bar: #2b3242;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text); line-height: 1.45;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  header {
+    background: var(--card); border-bottom: 1px solid var(--line);
+    padding: 18px 24px; display: flex; flex-wrap: wrap; gap: 12px;
+    justify-content: space-between; align-items: center;
+  }
+  header h1 { margin: 0; font-size: 1.15rem; }
+  header p { margin: 2px 0 0; color: var(--muted); font-size: .9rem; }
+  main { max-width: 1000px; margin: 0 auto; padding: 20px 16px 64px; display: grid; gap: 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
+  .card h2 { margin: 0 0 10px; font-size: 1rem; }
+  .card .sub { margin: -4px 0 12px; color: var(--muted); font-size: .88rem; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+  .banner { background: var(--no-bg); color: var(--no); border: 1px solid var(--no); border-radius: 10px; padding: 10px 14px; }
+  .decision.ok { background: var(--ok-bg); border-color: var(--ok); }
+  .decision.no { background: var(--no-bg); border-color: var(--no); }
+  .decision.info { background: var(--info-bg); border-color: var(--info); }
+  .decision.ok h2 { color: var(--ok); }
+  .decision.no h2 { color: var(--no); }
+  .decision.info h2 { color: var(--info); }
+  .lead { margin: 0 0 10px; font-size: 1.02rem; }
+  .kv { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; font-size: .92rem; border-top: 1px solid var(--line); }
+  .kv span { color: var(--muted); }
+  code { font-size: .8rem; word-break: break-all; }
+  .bar { height: 10px; background: var(--bar); border-radius: 6px; overflow: hidden; margin: 8px 0 6px; }
+  .bar > span { display: block; height: 100%; background: var(--accent); }
+  .meta { display: flex; justify-content: space-between; font-size: .9rem; color: var(--muted); }
+  .meta strong { color: var(--text); }
+  .person { padding: 10px 0; border-top: 1px solid var(--line); }
+  .person:first-of-type { border-top: 0; padding-top: 0; }
+  .person .name { display: flex; justify-content: space-between; font-weight: 600; }
+  .person .plan { font-weight: 400; color: var(--muted); font-size: .88rem; }
+  label { display: block; font-size: .82rem; color: var(--muted); margin-bottom: 3px; }
+  select, input {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
+    background: var(--bg); color: var(--text); font: inherit;
+  }
+  .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; align-items: end; }
+  button {
+    padding: 8px 14px; border-radius: 8px; border: 1px solid var(--accent);
+    background: var(--accent); color: var(--accent-text); font: inherit; cursor: pointer;
+  }
+  button.secondary { background: transparent; color: var(--accent); }
+  button:disabled { opacity: .5; cursor: default; }
+  ol.steps { list-style: none; margin: 0; padding: 0; counter-reset: step; }
+  ol.steps li {
+    counter-increment: step; display: flex; gap: 12px; align-items: center;
+    justify-content: space-between; padding: 10px 0; border-top: 1px solid var(--line);
+  }
+  ol.steps li:first-child { border-top: 0; }
+  ol.steps li > div::before { content: counter(step) ". "; color: var(--muted); }
+  ol.steps .note { color: var(--muted); font-size: .86rem; margin-left: 1.2rem; }
+  ol.steps li.done strong::after { content: "  ✓"; color: var(--ok); }
+  table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  th, td { text-align: left; padding: 7px 6px; border-top: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 500; border-top: 0; }
+  .tag-ok { color: var(--ok); font-weight: 600; }
+  .tag-no { color: var(--no); font-weight: 600; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>DocuFlow</h1>
+    <p>Example application using QuotaCore to meter document processing · <span id="month"></span></p>
+  </div>
+  <button class="secondary" id="reset">Reset demo (new account)</button>
+</header>
+
+<main>
+  <div class="banner" id="banner" hidden></div>
+
+  <section class="card decision" id="decision">
+    <h2>Last decision</h2>
+    <p class="lead">Nothing yet. Process a document, or run the guided demo below.</p>
+  </section>
+
+  <div class="grid">
+    <section class="card">
+      <h2>Shared account allowance</h2>
+      <p class="sub" id="accountPlan"></p>
+      <div id="accountMeter"></div>
+    </section>
+    <section class="card">
+      <h2>Users</h2>
+      <div id="users"></div>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>Process a document</h2>
+    <p class="sub">One page costs one unit. The app asks QuotaCore first and only does the work if the answer is yes.</p>
+    <div class="row">
+      <div><label for="docUser">User</label><select id="docUser"></select></div>
+      <div><label for="docPages">Pages (units)</label><input id="docPages" type="number" min="1" max="1000" value="5"></div>
+      <div><button id="docGo">Process document</button></div>
+    </div>
+    <div class="actions">
+      <button class="secondary" id="docRetry">Send the last request again (same request id)</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Guided demo</h2>
+    <p class="sub">Run the steps in order (or all at once). Plans change between steps; the client code never does.</p>
+    <ol class="steps" id="steps"></ol>
+    <div class="actions"><button id="runAll">Run all steps</button></div>
+  </section>
+
+  <section class="card">
+    <h2>Configure plans</h2>
+    <p class="sub">These calls change QuotaCore's rules. Nothing in this application is redeployed.</p>
+
+    <div class="row">
+      <div><label for="cfgUser">User</label><select id="cfgUser"></select></div>
+      <div><label for="cfgUserPlan">User plan</label><select id="cfgUserPlan"></select></div>
+      <div><button id="cfgUserGo">Switch user plan</button></div>
+    </div>
+
+    <div class="row" style="margin-top:14px">
+      <div><label for="cfgAccountPlan">Account plan</label><select id="cfgAccountPlan"></select></div>
+      <div><button id="cfgAccountGo">Switch account plan</button></div>
+    </div>
+
+    <div class="row" style="margin-top:14px">
+      <div><label for="cfgEditPlan">Edit a custom plan</label><select id="cfgEditPlan"></select></div>
+      <div><label for="cfgMonthly">Monthly allowance</label><input id="cfgMonthly" type="number" min="0"></div>
+      <div><label for="cfgMax">Max per request</label><input id="cfgMax" type="number" min="1"></div>
+      <div><button id="cfgEditGo">Save plan</button></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Recent requests</h2>
+    <table>
+      <thead><tr><th>Time</th><th>User</th><th>Units</th><th>Outcome</th></tr></thead>
+      <tbody id="history"></tbody>
+    </table>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (value) => String(value).replace(/[&<>"']/g, (c) => ({
+  "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+}[c]));
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+const RULE = {
+  max_units_per_request: "maximum units per request",
+  monthly_allowance: "monthly allowance",
+};
+
+let state = null;
+
+async function api(path, { method = "GET", body } = {}) {
+  const res = await fetch(path, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error ?? `Request failed (${res.status})`);
+  return data;
+}
+
+function showError(error) {
+  const el = $("banner");
+  el.textContent = error.message ?? String(error);
+  el.hidden = false;
+}
+
+const clearError = () => { $("banner").hidden = true; };
+
+async function guarded(fn) {
+  try {
+    clearError();
+    return await fn();
+  } catch (error) {
+    showError(error);
+  }
+}
+
+
+function meter(level) {
+  const allowance = level.plan.monthlyAllowance;
+  const pct = allowance > 0
+    ? Math.min(100, Math.round((level.consumedUnits / allowance) * 100))
+    : 100;
+  return `
+    <div class="bar"><span style="width:${pct}%"></span></div>
+    <div class="meta"><span>${level.consumedUnits} of ${allowance} used</span><strong>${level.remainingUnits ?? "-"} left</strong></div>
+    <div class="meta"><span>Max per request</span><span>${level.plan.maxUnitsPerRequest}</span></div>`;
+}
+
+function fillSelect(el, options) {
+  const previous = el.value;
+  el.innerHTML = options
+    .map((o) => `<option value="${esc(o.value)}">${esc(o.label)}</option>`)
+    .join("");
+  if (options.some((o) => o.value === previous)) el.value = previous;
+}
+
+function prefillEdit() {
+  const plan = [...state.plans.account, ...state.plans.user]
+    .find((p) => p.id === $("cfgEditPlan").value);
+  $("cfgMonthly").value = plan ? plan.monthlyAllowance : "";
+  $("cfgMax").value = plan ? plan.maxUnitsPerRequest : "";
+}
+
+function render() {
+  $("month").textContent = state.month;
+
+  $("accountPlan").textContent = `Plan: ${state.account.plan.name}`;
+  $("accountMeter").innerHTML = meter(state.account);
+
+  $("users").innerHTML = state.users.map((u) => `
+    <div class="person">
+      <div class="name"><span>${esc(cap(u.externalUserId))}</span><span class="plan">${esc(u.plan.name)}</span></div>
+      ${meter(u)}
+    </div>`).join("");
+
+  const userOptions = state.users.map((u) => ({ value: u.externalUserId, label: cap(u.externalUserId) }));
+  fillSelect($("docUser"), userOptions);
+  fillSelect($("cfgUser"), userOptions);
+  fillSelect($("cfgUserPlan"), state.plans.user.map((p) => ({ value: p.id, label: p.name })));
+  fillSelect($("cfgAccountPlan"), state.plans.account.map((p) => ({ value: p.id, label: p.name })));
+
+  const custom = [...state.plans.account, ...state.plans.user].filter((p) => !p.isPredefined);
+  fillSelect($("cfgEditPlan"), custom.map((p) => ({ value: p.id, label: `${p.name} (${p.planType})` })));
+  if ($("cfgMonthly").value === "") prefillEdit();
+
+  $("history").innerHTML = state.history.length === 0
+    ? `<tr><td colspan="4">No requests yet.</td></tr>`
+    : state.history.map((h) => {
+        const outcome = h.accepted
+          ? `<span class="tag-ok">Accepted</span>`
+          : `<span class="tag-no">Rejected</span> · ${esc(h.rejection.scope)} · ${esc(RULE[h.rejection.rule] ?? h.rejection.rule)}`;
+        return `<tr>
+          <td>${esc(new Date(h.createdAt).toLocaleTimeString())}</td>
+          <td>${esc(cap(h.externalUserId))}</td>
+          <td>${h.units}</td>
+          <td>${outcome}</td></tr>`;
+      }).join("");
+}
+
+async function refresh() {
+  state = await api("/api/state");
+  render();
+}
+
+function showDecision(d) {
+  const el = $("decision");
+  el.className = "card decision " + (d.accepted ? "ok" : "no");
+  const title = d.accepted
+    ? (d.replayed ? "Same request, same answer" : "Accepted")
+    : "Rejected";
+  const rejection = d.rejection
+    ? `<div class="kv"><span>Rejected by</span><strong>${esc(d.rejection.scope)} plan · ${esc(RULE[d.rejection.rule] ?? d.rejection.rule)}</strong></div>`
+    : "";
+  el.innerHTML = `
+    <h2>${esc(title)} – ${esc(d.documentName)}</h2>
+    <p class="lead">${esc(d.message)}</p>
+    ${rejection}
+    <div class="kv"><span>Units requested</span><strong>${d.units}</strong></div>
+    <div class="kv"><span>Remaining now</span><strong>account ${d.remaining.account} · ${esc(cap(d.externalUserId))} ${d.remaining.user}</strong></div>
+    <div class="kv"><span>Request id</span><code>${esc(d.requestId)}</code></div>`;
+}
+
+function showInfo(text) {
+  const el = $("decision");
+  el.className = "card decision info";
+  el.innerHTML = `<h2>Plan changed</h2><p class="lead">${esc(text)}</p>`;
+}
+
+//  actions 
+
+const planId = (type, name) => {
+  const plan = state.plans[type].find((p) => p.name === name);
+  if (!plan) throw new Error(`Plan "${name}" not found. Try "Reset demo".`);
+  return plan.id;
+};
+
+async function processDoc(externalUserId, pages) {
+  const decision = await api("/api/documents", { method: "POST", body: { externalUserId, pages } });
+  showDecision(decision);
+  await refresh();
+}
+
+async function switchUser(externalUserId, id, label) {
+  await api(`/api/users/${encodeURIComponent(externalUserId)}/plan`, { method: "POST", body: { planId: id } });
+  showInfo(`${cap(externalUserId)} is now on the "${label}" plan. The client code did not change.`);
+  await refresh();
+}
+
+async function switchAccount(id, label) {
+  await api("/api/account/plan", { method: "POST", body: { planId: id } });
+  showInfo(`The account is now on the "${label}" plan. The client code did not change.`);
+  await refresh();
+}
+
+const STEPS = [
+  {
+    title: "Ahmad processes a 5-page document",
+    note: "Within his plan and the account's plan: accepted.",
+    run: () => processDoc("ahmad", 5),
+  },
+  {
+    title: "Ahmad processes a 15-page document",
+    note: "His Basic plan allows 10 units per request: rejected by a user limit.",
+    run: () => processDoc("ahmad", 15),
+  },
+  {
+    title: "Sara processes a 30-page document",
+    note: "Her Premium plan and the account both allow it: accepted.",
+    run: () => processDoc("sara", 30),
+  },
+  {
+    title: "Sara processes another 30-page document",
+    note: "Sara still has plenty of her own allowance, but the account has only 25 units left: rejected by the shared account limit.",
+    run: () => processDoc("sara", 30),
+  },
+  {
+    title: "Switch the account to the Large plan",
+    note: "Only a plan assignment changes.",
+    run: () => switchAccount(planId("account", "Demo Account Large"), "Demo Account Large"),
+  },
+  {
+    title: "Sara processes the 30-page document again",
+    note: "Same request as before, new plan: accepted.",
+    run: () => processDoc("sara", 30),
+  },
+  {
+    title: "Upgrade Ahmad to the Premium plan",
+    note: "His consumed units are kept; only his limits change.",
+    run: () => switchUser("ahmad", planId("user", "Demo Premium"), "Demo Premium"),
+  },
+  {
+    title: "Ahmad processes the 15-page document again",
+    note: "Rejected earlier, now allowed by his new plan.",
+    run: () => processDoc("ahmad", 15),
+  },
+];
+
+function renderSteps() {
+  $("steps").innerHTML = STEPS.map((s, i) => `
+    <li>
+      <div><strong>${esc(s.title)}</strong><div class="note">${esc(s.note)}</div></div>
+      <button class="secondary" data-step="${i}">Run</button>
+    </li>`).join("");
+}
+
+async function runStep(index) {
+  await STEPS[index].run();
+  $("steps").children[index].classList.add("done");
+}
+
+$("steps").addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-step]");
+  if (button) guarded(() => runStep(Number(button.dataset.step)));
+});
+
+$("runAll").addEventListener("click", () => guarded(async () => {
+  $("runAll").disabled = true;
+  try {
+    for (let i = 0; i < STEPS.length; i++) {
+      await runStep(i);
+      await new Promise((resolve) => setTimeout(resolve, 900));
+    }
+  } finally {
+    $("runAll").disabled = false;
+  }
+}));
+
+$("docGo").addEventListener("click", () => guarded(() =>
+  processDoc($("docUser").value, Number($("docPages").value))));
+
+$("docRetry").addEventListener("click", () => guarded(async () => {
+  const decision = await api("/api/documents/retry", { method: "POST" });
+  showDecision(decision);
+  await refresh();
+}));
+
+$("cfgUserGo").addEventListener("click", () => guarded(async () => {
+  const select = $("cfgUserPlan");
+  await switchUser($("cfgUser").value, select.value, select.selectedOptions[0].textContent);
+}));
+
+$("cfgAccountGo").addEventListener("click", () => guarded(async () => {
+  const select = $("cfgAccountPlan");
+  await switchAccount(select.value, select.selectedOptions[0].textContent);
+}));
+
+$("cfgEditPlan").addEventListener("change", prefillEdit);
+
+$("cfgEditGo").addEventListener("click", () => guarded(async () => {
+  await api(`/api/plans/${$("cfgEditPlan").value}`, {
+    method: "POST",
+    body: {
+      monthlyAllowance: Number($("cfgMonthly").value),
+      maxUnitsPerRequest: Number($("cfgMax").value),
+    },
+  });
+  showInfo("Plan saved. The next request from every user or account on this plan uses the new limits.");
+  await refresh();
+}));
+
+$("reset").addEventListener("click", () => guarded(async () => {
+  await api("/api/reset", { method: "POST" });
+  $("cfgMonthly").value = "";
+  renderSteps();
+  $("decision").className = "card decision";
+  $("decision").innerHTML = `<h2>Last decision</h2><p class="lead">Fresh demo account created.</p>`;
+  await refresh();
+}));
+
+renderSteps();
+guarded(refresh);
+</script>
+</body>
+</html>
