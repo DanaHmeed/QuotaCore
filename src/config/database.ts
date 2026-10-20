@@ -1,15 +1,17 @@
-
-import "dotenv/config";
-import { Pool } from "pg";
 import pg from "pg";
-
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL is not defined");
-}
 
 pg.types.setTypeParser(20, (value) => Number(value));
 
-export const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  max: 10,
+const connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) {
+  throw new Error(
+    "DATABASE_URL is not set. Copy .env.example to .env, or run the stack " +
+      "with docker compose."
+  );
+}
+
+export const pool = new pg.Pool({
+  connectionString,
+  max: Number(process.env.DB_POOL_MAX ?? 10),
 });
