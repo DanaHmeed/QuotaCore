@@ -23,8 +23,7 @@ services:
     build: .
     environment:
       DATABASE_URL: postgres://quotacore:quotacore@db:5432/quotacore_db
-      # Development default so that `docker compose up --build` works with no
-      # setup. Put your own value in .env (see .env.example) for anything else.
+      DB_POOL_MAX: ${DB_POOL_MAX:-10}
       ADMIN_BOOTSTRAP_KEY: ${ADMIN_BOOTSTRAP_KEY:-dev-admin-key-change-me}
       PORT: "3000"
     ports:

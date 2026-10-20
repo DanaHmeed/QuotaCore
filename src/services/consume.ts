@@ -36,19 +36,19 @@ interface CounterRow {
   consumed_units: number;
 }
 
-interface LimitsRow {
+// Current limits and, when this requestId was seen before, the stored
+// decision. Both come back from one query.
+interface StateRow {
   account_allowance: number;
   account_max: number;
   user_allowance: number;
   user_max: number;
-}
-
-interface PreviousRequestRow {
-  user_id: string;
-  requested_units: number;
-  accepted: boolean;
-  rejection_scope: Scope | null;
-  rejection_rule: Rule | null;
+  has_previous: boolean;
+  previous_user_id: string | null;
+  previous_units: number | null;
+  previous_accepted: boolean | null;
+  previous_scope: Scope | null;
+  previous_rule: Rule | null;
 }
 
 function remainingAfter(level: LevelState, applied: number): number {
@@ -124,67 +124,68 @@ async function decide(
     [accountId, userId]
   );
 
-  // 4. Read the CURRENT limits (after the locks, so plan changes that were
-  //    already committed are always seen).
-  const limitsRes = await client.query<LimitsRow>(
+  // 4. One query, after the locks: the CURRENT limits (so plan changes that
+  //    were already committed are always seen) and the stored decision for
+  //    this requestId, if any. It runs after the account lock, so two
+  //    concurrent retries of the same requestId can never both pass it.
+  const stateRes = await client.query<StateRow>(
     `
     SELECT ap.monthly_allowance AS account_allowance,
            ap.max_units_per_request AS account_max,
            up.monthly_allowance AS user_allowance,
-           up.max_units_per_request AS user_max
+           up.max_units_per_request AS user_max,
+           (r.id IS NOT NULL) AS has_previous,
+           r.user_id AS previous_user_id,
+           r.requested_units AS previous_units,
+           r.accepted AS previous_accepted,
+           r.rejection_scope AS previous_scope,
+           r.rejection_rule AS previous_rule
     FROM accounts a
     JOIN plans ap ON ap.id = a.plan_id
     JOIN users u ON u.id = $2 AND u.account_id = a.id
     JOIN plans up ON up.id = u.plan_id
+    LEFT JOIN consumption_requests r
+      ON r.account_id = a.id AND r.request_id = $3
     WHERE a.id = $1
     `,
-    [accountId, userId]
+    [accountId, userId, requestId]
   );
 
-  const limits = limitsRes.rows[0];
+  const state = stateRes.rows[0];
   const accountUsed = accountCounter.rows[0];
   const userUsed = userCounter.rows[0];
 
-  if (!limits || !accountUsed || !userUsed) {
+  if (!state || !accountUsed || !userUsed) {
     throw new Error("Inconsistent state: missing limits or counters");
   }
 
   const account: LevelState = {
-    monthlyAllowance: limits.account_allowance,
-    maxUnitsPerRequest: limits.account_max,
+    monthlyAllowance: state.account_allowance,
+    maxUnitsPerRequest: state.account_max,
     consumedUnits: accountUsed.consumed_units,
   };
   const user: LevelState = {
-    monthlyAllowance: limits.user_allowance,
-    maxUnitsPerRequest: limits.user_max,
+    monthlyAllowance: state.user_allowance,
+    maxUnitsPerRequest: state.user_max,
     consumedUnits: userUsed.consumed_units,
   };
 
-  // 5. Idempotency. Checked AFTER the lock, so two concurrent retries of the
-  //    same requestId can never both pass this check.
-  const existing = await client.query<PreviousRequestRow>(
-    `
-    SELECT user_id, requested_units, accepted, rejection_scope, rejection_rule
-    FROM consumption_requests
-    WHERE account_id = $1 AND request_id = $2
-    `,
-    [accountId, requestId]
-  );
-
-  const previous = existing.rows[0];
-  if (previous) {
-    if (previous.user_id !== userId || previous.requested_units !== units) {
+  // 5. Idempotency.
+  if (state.has_previous) {
+    if (state.previous_user_id !== userId || state.previous_units !== units) {
       return { kind: "request_id_conflict" };
     }
+
+    const wasAccepted = state.previous_accepted === true;
 
     return {
       kind: "decision",
       decision: {
-        accepted: previous.accepted,
+        accepted: wasAccepted,
         // The CHECK constraint guarantees scope/rule exist when rejected.
-        rejection: previous.accepted
+        rejection: wasAccepted
           ? null
-          : { scope: previous.rejection_scope!, rule: previous.rejection_rule! },
+          : { scope: state.previous_scope!, rule: state.previous_rule! },
         replayed: true,
         remaining: {
           account: remainingUnits(account),
@@ -196,37 +197,36 @@ async function decide(
 
   // 6. Decide.
   const rejection = evaluate(units, account, user);
-  const applied = rejection ? 0 : units;
+  const accepted = rejection === null;
+  const applied = accepted ? units : 0;
 
-  // 7. Accepted: add the units to BOTH counters in one statement.
-  if (!rejection) {
-    await client.query(
-      `
-      UPDATE usage_counters
-      SET consumed_units = consumed_units + $3
-      WHERE account_id = $1
-        AND month_start = ${MONTH_START}
-        AND (user_id IS NULL OR user_id = $2)
-      `,
-      [accountId, userId, units]
-    );
-  }
-
-  // 8. Record the outcome, accepted or rejected.
+  // 7. Write everything in ONE statement: add the units to both counters
+  //    (only when accepted) and record the outcome, accepted or rejected.
+  //    A data-modifying CTE always runs to completion, even though the main
+  //    INSERT does not read its output.
   await client.query(
     `
+    WITH bump AS (
+      UPDATE usage_counters
+      SET consumed_units = consumed_units + $3
+      WHERE $5::boolean
+        AND account_id = $1
+        AND month_start = ${MONTH_START}
+        AND (user_id IS NULL OR user_id = $2)
+      RETURNING 1
+    )
     INSERT INTO consumption_requests (
       account_id, user_id, request_id, requested_units,
       accepted, rejection_scope, rejection_rule
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    VALUES ($1, $2, $4, $3, $5, $6, $7)
     `,
     [
       accountId,
       userId,
-      requestId,
       units,
-      rejection === null,
+      requestId,
+      accepted,
       rejection?.scope ?? null,
       rejection?.rule ?? null,
     ]
@@ -235,7 +235,7 @@ async function decide(
   return {
     kind: "decision",
     decision: {
-      accepted: rejection === null,
+      accepted,
       rejection,
       replayed: false,
       remaining: {
